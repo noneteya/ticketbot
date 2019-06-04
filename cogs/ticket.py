@@ -119,11 +119,9 @@ class Ticket(commands.Cog):
             await channel.send(embed=embed)
 
     @commands.command()
-    async def close(self, ctx, channel: discord.TextChannel = None, *, reason="done"):
+    async def close(self, ctx, *, reason="done"):
         guild = ctx.author.guild
-
-        if channel is None:
-            channel = ctx.message.channel
+        channel = ctx.message.channel
 
         if ("ticket-" in channel.name) and (channel != self.settings[guild.id]["editing_ticket"]):
             args = channel.topic.split(",")
