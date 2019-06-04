@@ -82,6 +82,12 @@ class Ticket(commands.Cog):
         if channel is None:
             channel = ctx.message.channel
 
+        if user == self.bot.user:
+            embed = discord.Embed(title="Error", description="Botは追加も削除もできません", color=0xdea1ff)
+            embed.set_footer(text="Made by Noneteya")
+
+            await channel.send(embed=embed)
+
         if "ticket-" in channel.name:
             await channel.set_permissions(user, read_messages=True)
 
@@ -97,6 +103,12 @@ class Ticket(commands.Cog):
 
         if channel is None:
             channel = ctx.message.channel
+
+        if user == self.bot.user:
+            embed = discord.Embed(title="Error", description="Botは追加も削除もできません", color=0xdea1ff)
+            embed.set_footer(text="Made by Noneteya")
+
+            await channel.send(embed=embed)
 
         if "ticket-" in channel.name:
             await channel.set_permissions(user, read_messages=False)
