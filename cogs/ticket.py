@@ -16,6 +16,7 @@ class Ticket(commands.Cog):
         self.ticket_id = 0
 
         self.admin_role = None
+        self.editing_ticket = None
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -89,11 +90,12 @@ class Ticket(commands.Cog):
         if channel is None:
             channel = ctx.message.channel
 
-        if "ticket-" in channel.name:
+        if ("ticket-" in channel.name) and (channel != self.editing_ticket):
             await channel.send(f"このチャンネルを10秒後に削除します\nReason: {reason}")
             args = channel.topic.split(",")
             topic = args[0]
             reporter = int(args[1])
+            self.editing_ticket = channel
             await asyncio.sleep(10)
             await channel.delete()
             user = await self.bot.fetch_user(reporter)
