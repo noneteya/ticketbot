@@ -62,9 +62,15 @@ class Ticket(commands.Cog):
             ctx.author: discord.PermissionOverwrite(read_messages=True)
         }
 
-        self.ticket_id += 1
-        ticket_channel = await guild.create_text_channel(f"ticket-{ self.ticket_id }-{ arg }", category=self.tickets_category, overwrites=overwrites, topic=f"{arg},{ctx.author.id}")
-        await ctx.send(f"チケット { ticket_channel.mention } を作成しました")
+        self.settings[guild.id]['ticket_id'] += 1
+        ticket_channel = await guild.create_text_channel(f"ticket-{ self.settings[guild.id]['ticket_id'] }-{ arg }", category=self.settings[guild.id]["tickets_category"], overwrites=overwrites, topic=f"{arg},{ctx.author.id}")
+
+        embed = discord.Embed(title="New Ticket Created", description="新しいチケットを作成しました", color=0xdea1ff)
+        embed.add_field(name="チャンネル", value=ticket_channel.mention, inline=True)
+        embed.add_field(name="トピック", value=arg, inline=True)
+        embed.set_footer(text="Made by Noneteya")
+
+        await ctx.send(embed=embed)
 
         display_name = guild.me.display_name.split()[0]
         await guild.me.edit(nick=f"{display_name} {self.settings[guild.id]['ticket_id']}")
@@ -78,7 +84,12 @@ class Ticket(commands.Cog):
 
         if "ticket-" in channel.name:
             await channel.set_permissions(user, read_messages=True)
-            await channel.send(f"{user.mention} をチャンネルに追加しました")
+
+            embed = discord.Embed(title="Member Removed", description="メンバーをトピックに追加しました", color=0xdea1ff)
+            embed.add_field(name="メンバー", value=user.mention, inline=True)
+            embed.set_footer(text="Made by Noneteya")
+
+            await channel.send(embed=embed)
 
     @commands.command()
     async def remove(self, ctx, user: discord.Member, channel: discord.TextChannel = None):
@@ -89,7 +100,11 @@ class Ticket(commands.Cog):
 
         if "ticket-" in channel.name:
             await channel.set_permissions(user, read_messages=False)
-            await channel.send(f"{user.mention} をチャンネルから削除しました")
+            embed = discord.Embed(title="Member Removed", description="メンバーをトピックから削除しました", color=0xdea1ff)
+            embed.add_field(name="メンバー", value=user.mention, inline=True)
+            embed.set_footer(text="Made by Noneteya")
+
+            await channel.send(embed=embed)
 
     @commands.command()
     async def close(self, ctx, channel: discord.TextChannel = None, *, reason="done"):
@@ -98,16 +113,32 @@ class Ticket(commands.Cog):
         if channel is None:
             channel = ctx.message.channel
 
-        if ("ticket-" in channel.name) and (channel != self.editing_ticket):
-            await channel.send(f"このチャンネルを10秒後に削除します\nReason: {reason}")
+        if ("ticket-" in channel.name) and (channel != self.settings[guild.id]["editing_ticket"]):
             args = channel.topic.split(",")
             topic = args[0]
+            ticket_name = channel.name
             reporter = int(args[1])
-            self.editing_ticket = channel
+            user = await self.bot.fetch_user(reporter)
+
+            embed = discord.Embed(title="Topic Close", description="このチャンネルを10秒後に削除します", color=0xdea1ff)
+            embed.add_field(name=":mega: 報告者", value=user.mention, inline=True)
+            embed.add_field(name=":speech_balloon: 理由", value=reason, inline=True)
+            embed.set_footer(text="Made by Noneteya")
+
+            await channel.send(embed=embed)
+
+            self.settings[guild.id]["editing_ticket"] = channel
             await asyncio.sleep(10)
             await channel.delete()
-            user = await self.bot.fetch_user(reporter)
-            await user.send(f"トピック {topic} はクローズされました。\nReason: {reason}")
+
+            embed = discord.Embed(title="Topic Closed", description="あなたの報告したトピックが削除されました", color=0xdea1ff)
+            embed.add_field(name=":ticket:  チケットID", value=ticket_name, inline=True)
+            embed.add_field(name=":mega: 報告者", value=user.mention, inline=True)
+            embed.add_field(name=":wastebasket: 削除者", value=user.mention, inline=True)
+            embed.add_field(name=":speech_balloon: 理由", value=reason, inline=True)
+            embed.set_footer(text="Made by Noneteya")
+
+            await user.send(embed=embed)
     #
     # @commands.command()
     # async def voice(self, ctx, channel: discord.TextChannel = None):
