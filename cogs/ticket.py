@@ -11,36 +11,42 @@ def setup(bot):
 class Ticket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.tickets_category = None
-        self.archives_cartegory = None
-        self.ticket_id = 0
 
-        self.admin_role = None
-        self.editing_ticket = None
+        self.settings = {
+            585045504170262529: {
+                "ticket_id": 0,
+                "tickets_category": None,
+                "archives_cartegory": None,
+                "editing_ticket": None,
+                "admin_role": None
+            }
+        }
 
     @commands.Cog.listener()
     async def on_ready(self):
-        guild = discord.utils.get(self.bot.guilds, id=585045504170262529)
 
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            guild.me: discord.PermissionOverwrite(read_messages=True)
-        }
+        for i in self.settings.keys():
+            guild = discord.utils.get(self.bot.guilds, id=i)
 
-        self.tickets_category = discord.utils.get(guild.categories, name='tickets')
-        self.archives_cartegory = discord.utils.get(guild.categories, name='archives')
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                guild.me: discord.PermissionOverwrite(read_messages=True)
+            }
 
-        if self.tickets_category is None:
-            self.tickets_category = await guild.create_category("tickets", overwrites=overwrites)
+            self.settings[guild.id]["tickets_category"] = discord.utils.get(guild.categories, name='tickets')
+            self.settings[guild.id]["archives_category"] = discord.utils.get(guild.categories, name='archives')
 
-        if self.archives_cartegory is None:
-            self.archives_cartegory = await guild.create_category("archives", overwrites=overwrites)
+            if self.settings[guild.id]["tickets_category"] is None:
+                self.settings[guild.id]["tickets_category"] = await guild.create_category("tickets", overwrites=overwrites)
 
-        if len(guild.me.display_name.split()) == 1:
-            self.ticket_id = 0
-            await guild.me.edit(nick=f"{guild.me.display_name} {self.ticket_id}")
-        else:
-            self.ticket_id = int( guild.me.display_name.split()[1])
+            if self.settings[guild.id]["archives_category"] is None:
+                self.settings[guild.id]["archive_category"] = await guild.create_category("archives", overwrites=overwrites)
+
+            if len(guild.me.display_name.split()) == 1:
+                self.settings[guild.id]["ticket_id"] = 0
+                await guild.me.edit(nick=f"{guild.me.display_name} {self.settings[guild.id]['ticket_id']}")
+            else:
+                self.settings[guild.id]["ticket_id"] = int(guild.me.display_name.split()[1])
 
         print("ready")
 
@@ -61,7 +67,7 @@ class Ticket(commands.Cog):
         await ctx.send(f"チケット { ticket_channel.mention } を作成しました")
 
         display_name = guild.me.display_name.split()[0]
-        await guild.me.edit(nick=f"{display_name} {self.ticket_id}")
+        await guild.me.edit(nick=f"{display_name} {self.settings[guild.id]['ticket_id']}")
 
     @commands.command()
     async def add(self, ctx, user: discord.Member, channel: discord.TextChannel = None):
@@ -87,6 +93,8 @@ class Ticket(commands.Cog):
 
     @commands.command()
     async def close(self, ctx, channel: discord.TextChannel = None, *, reason="done"):
+        guild = ctx.author.guild
+
         if channel is None:
             channel = ctx.message.channel
 
