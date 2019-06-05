@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import typing
 import asyncio
+from pymongo import MongoClient
+client = MongoClient('localhost', 27017)
 
 
 def setup(bot):
@@ -12,45 +14,70 @@ class Ticket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-        self.settings = {
-            585045504170262529: {
-                "ticket_id": 0,
-                "tickets_category": None,
-                "archives_cartegory": None,
-                "editing_ticket": None,
-                "admin_role": None
-            }
-        }
+        self.settings = {}
+
+        self.db = client.ticketbot
+        self.settings_collection = self.db.settings
 
     @commands.Cog.listener()
     async def on_ready(self):
 
-        for i in self.settings.keys():
-            guild = discord.utils.get(self.bot.guilds, id=i)
+        for guild in self.bot.guilds:
+            self.settings = self.settings.find()
 
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 guild.me: discord.PermissionOverwrite(read_messages=True)
             }
 
-            self.settings[guild.id]["tickets_category"] = discord.utils.get(guild.categories, name='tickets').id
-            self.settings[guild.id]["archives_category"] = discord.utils.get(guild.categories, name='archives').id
+            self.settings[str(guild.id)]["tickets_category"] = discord.utils.get(guild.categories, name='tickets').id
+            self.settings[str(guild.id)]["archives_category"] = discord.utils.get(guild.categories, name='archives').id
 
-            if self.settings[guild.id]["tickets_category"] is None:
+            if self.settings[str(guild.id)]["tickets_category"] is None:
                 tc = await guild.create_category("tickets", overwrites=overwrites)
-                self.settings[guild.id]["tickets_category"] = tc.id
+                self.settings[str(guild.id)]["tickets_category"] = tc.id
 
-            if self.settings[guild.id]["archives_category"] is None:
+            if self.settings[str(guild.id)]["archives_category"] is None:
                 ac = await guild.create_category("archives", overwrites=overwrites)
-                self.settings[guild.id]["archive_category"] = ac.id
+                self.settings[str(guild.id)]["archive_category"] = ac.id
 
             if len(guild.me.display_name.split()) == 1:
-                self.settings[guild.id]["ticket_id"] = 0
-                await guild.me.edit(nick=f"{guild.me.display_name} {self.settings[guild.id]['ticket_id']}")
+                self.settings[str(guild.id)]["ticket_id"] = 0
+                await guild.me.edit(nick=f"{guild.me.display_name} {self.settings[str(guild.id)]['ticket_id']}")
             else:
-                self.settings[guild.id]["ticket_id"] = int(guild.me.display_name.split()[1])
+                self.settings[str(guild.id)]["ticket_id"] = int(guild.me.display_name.split()[1])
+
+        await self.save_to_db()
 
         print("ready")
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        self.settings = self.settings.find()
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            guild.me: discord.PermissionOverwrite(read_messages=True)
+        }
+
+        self.settings[str(guild.id)]["tickets_category"] = discord.utils.get(guild.categories, name='tickets').id
+        self.settings[str(guild.id)]["archives_category"] = discord.utils.get(guild.categories, name='archives').id
+
+        if self.settings[str(guild.id)]["tickets_category"] is None:
+            tc = await guild.create_category("tickets", overwrites=overwrites)
+            self.settings[str(guild.id)]["tickets_category"] = tc.id
+
+        if self.settings[str(guild.id)]["archives_category"] is None:
+            ac = await guild.create_category("archives", overwrites=overwrites)
+            self.settings[str(guild.id)]["archive_category"] = ac.id
+
+        if len(guild.me.display_name.split()) == 1:
+            self.settings[str(guild.id)]["ticket_id"] = 0
+            await guild.me.edit(nick=f"{guild.me.display_name} {self.settings[str(guild.id)]['ticket_id']}")
+        else:
+            self.settings[str(guild.id)]["ticket_id"] = int(guild.me.display_name.split()[1])
+
+        await self.save_to_db()
 
     @commands.command()
     async def new(self, ctx, *, arg):
@@ -63,8 +90,8 @@ class Ticket(commands.Cog):
             ctx.author: discord.PermissionOverwrite(read_messages=True)
         }
 
-        self.settings[guild.id]['ticket_id'] += 1
-        ticket_channel = await guild.create_text_channel(f"ticket-{ self.settings[guild.id]['ticket_id'] }-{ arg }", category=discord.utils.get(guild.categories, id=self.settings[guild.id]["tickets_category"]), overwrites=overwrites, topic=f"{arg},{ctx.author.id}")
+        self.settings[str(guild.id)]['ticket_id'] += 1
+        ticket_channel = await guild.create_text_channel(f"ticket-{ self.settings[str(guild.id)]['ticket_id'] }-{ arg }", category=discord.utils.get(guild.categories, id=self.settings[str(guild.id)]["tickets_category"]), overwrites=overwrites, topic=f"{arg},{ctx.author.id}")
 
         embed = discord.Embed(title="New Ticket Created", description="新しいチケットを作成しました", color=0xdea1ff)
         embed.add_field(name="チャンネル", value=ticket_channel.mention, inline=True)
@@ -74,7 +101,9 @@ class Ticket(commands.Cog):
         await ctx.send(embed=embed)
 
         display_name = guild.me.display_name.split()[0]
-        await guild.me.edit(nick=f"{display_name} {self.settings[guild.id]['ticket_id']}")
+        await guild.me.edit(nick=f"{display_name} {self.settings[str(guild.id)]['ticket_id']}")
+
+        await self.save_to_db()
 
     @commands.command()
     async def add(self, ctx, user: discord.Member, channel: discord.TextChannel = None):
@@ -98,6 +127,8 @@ class Ticket(commands.Cog):
 
             await channel.send(embed=embed)
 
+        await self.save_to_db()
+
     @commands.command()
     async def remove(self, ctx, user: discord.Member, channel: discord.TextChannel = None):
         guild = ctx.author.guild
@@ -119,12 +150,14 @@ class Ticket(commands.Cog):
 
             await channel.send(embed=embed)
 
+        await self.save_to_db()
+
     @commands.command()
     async def close(self, ctx, *, reason="done"):
         guild = ctx.author.guild
         channel = ctx.message.channel
 
-        if ("ticket-" in channel.name) and (channel != self.settings[guild.id]["editing_ticket"]):
+        if ("ticket-" in channel.name) and (channel != self.settings[str(guild.id)]["editing_ticket"]):
             args = channel.topic.split(",")
             topic = args[0]
             ticket_name = channel.name
@@ -138,7 +171,7 @@ class Ticket(commands.Cog):
 
             await channel.send(embed=embed)
 
-            self.settings[guild.id]["editing_ticket"] = channel
+            self.settings[str(guild.id)]["editing_ticket"] = channel
             await asyncio.sleep(10)
             await channel.delete()
 
@@ -150,6 +183,14 @@ class Ticket(commands.Cog):
             embed.set_footer(text="Made by Noneteya")
 
             await user.send(embed=embed)
+
+        await self.save_to_db()
+
+    async def save_to_db(self):
+        print(self.settings)
+        result = self.settings_collection.many_insert(self.settings)
+        print(result)
+
     #
     # @commands.command()
     # async def voice(self, ctx, channel: discord.TextChannel = None):
