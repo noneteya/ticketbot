@@ -33,14 +33,16 @@ class Ticket(commands.Cog):
                 guild.me: discord.PermissionOverwrite(read_messages=True)
             }
 
-            self.settings[guild.id]["tickets_category"] = discord.utils.get(guild.categories, name='tickets')
-            self.settings[guild.id]["archives_category"] = discord.utils.get(guild.categories, name='archives')
+            self.settings[guild.id]["tickets_category"] = discord.utils.get(guild.categories, name='tickets').id
+            self.settings[guild.id]["archives_category"] = discord.utils.get(guild.categories, name='archives').id
 
             if self.settings[guild.id]["tickets_category"] is None:
-                self.settings[guild.id]["tickets_category"] = await guild.create_category("tickets", overwrites=overwrites)
+                tc = await guild.create_category("tickets", overwrites=overwrites)
+                self.settings[guild.id]["tickets_category"] = tc.id
 
             if self.settings[guild.id]["archives_category"] is None:
-                self.settings[guild.id]["archive_category"] = await guild.create_category("archives", overwrites=overwrites)
+                ac = await guild.create_category("archives", overwrites=overwrites)
+                self.settings[guild.id]["archive_category"] = ac.id
 
             if len(guild.me.display_name.split()) == 1:
                 self.settings[guild.id]["ticket_id"] = 0
@@ -49,7 +51,6 @@ class Ticket(commands.Cog):
                 self.settings[guild.id]["ticket_id"] = int(guild.me.display_name.split()[1])
 
         print("ready")
-
 
     @commands.command()
     async def new(self, ctx, *, arg):
@@ -63,7 +64,7 @@ class Ticket(commands.Cog):
         }
 
         self.settings[guild.id]['ticket_id'] += 1
-        ticket_channel = await guild.create_text_channel(f"ticket-{ self.settings[guild.id]['ticket_id'] }-{ arg }", category=self.settings[guild.id]["tickets_category"], overwrites=overwrites, topic=f"{arg},{ctx.author.id}")
+        ticket_channel = await guild.create_text_channel(f"ticket-{ self.settings[guild.id]['ticket_id'] }-{ arg }", category=discord.utils.get(guild.categories, id=self.settings[guild.id]["tickets_category"]), overwrites=overwrites, topic=f"{arg},{ctx.author.id}")
 
         embed = discord.Embed(title="New Ticket Created", description="新しいチケットを作成しました", color=0xdea1ff)
         embed.add_field(name="チャンネル", value=ticket_channel.mention, inline=True)
