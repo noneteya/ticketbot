@@ -1,0 +1,7 @@
+version: "3"
+
+services:
+  python:
+    restart: always
+    tty: true
+    build: .
